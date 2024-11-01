@@ -5,6 +5,7 @@ import os
 from collections import defaultdict
 
 import httpx
+import tqdm
 
 from parsers import parse_match_html
 from utils import HEADERS, fetch_url, write_file
@@ -66,7 +67,7 @@ async def get_matches_by_month() -> list[str]:
         responses = await asyncio.gather(*tasks)
 
     html_contents = []
-    for response, url in zip(responses, match_urls):
+    for response, url in tqdm.tqdm(zip(responses, match_urls), total=len(match_urls)):
         month = url.split("x-month=")[1]
         match_id = url.split("/")[4]
 
@@ -76,7 +77,4 @@ async def get_matches_by_month() -> list[str]:
 
         parse_match_html(content, month)
 
-        print(f"Match {match_id} has been parsed!")
-
     return html_contents
-
