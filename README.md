@@ -1,3 +1,5 @@
+[example output](https://github.com/angryfoxx/webscored/blob/main/assets/example_output.png)
+
 # Match Data CLI
 
 This project provides a command-line interface (CLI) to manage match data, allowing you to populate data from a JSON file, scrape data from external sources, and run both tasks in sequence.
