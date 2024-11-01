@@ -2,6 +2,7 @@ import json
 
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
+from tqdm import tqdm
 
 from constants import DATABASE_URI
 from models import Base, IncidentEvent
@@ -41,7 +42,7 @@ def populate_incident_events():
             incident_events.extend(data.get("home", {}).get("incidentEvents", []))
             incident_events.extend(data.get("away", {}).get("incidentEvents", []))
 
-    for event in incident_events:
+    for event in tqdm(incident_events, desc="Populating incident events"):
         incident_event = IncidentEvent(
             id=int(event.get("id")),
             event_id=event.get("eventId"),
