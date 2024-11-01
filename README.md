@@ -1,4 +1,4 @@
-[example output](https://github.com/angryfoxx/webscored/blob/main/assets/example_output.png)
+![example output](https://github.com/angryfoxx/webscored/blob/main/assets/example_output.png?raw=true)
 
 # Match Data CLI
 
