@@ -1,8 +1,9 @@
 import json
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
+from constants import DATABASE_URI
 from models import Base, IncidentEvent
 from utils import find_match_files
 
@@ -18,11 +19,14 @@ def populate_incident_events():
     print("\033[93mPopulating incident events...\033[0m")
     print(f"\033[93m{len(json_files)} files found\033[0m")
 
-    engine = create_engine("sqlite:///matches.db")
+    engine = create_engine(DATABASE_URI)
+    print("\033[93mConnected to the database!\033[0m")
+
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    Base.metadata.create_all(engine)
+    if not inspect(engine).has_table("incident_event"):
+        Base.metadata.create_all(engine)
 
     incident_events = []
     for json_file in json_files:

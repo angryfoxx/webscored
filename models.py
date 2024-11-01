@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Boolean, Column, Float, Integer, String
+from sqlalchemy import JSON, Boolean, Column, Float, Integer, String, BigInteger
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -6,7 +6,7 @@ Base = declarative_base()
 
 class IncidentEvent(Base):
     __tablename__ = "incident_event"
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, primary_key=True)
     event_id = Column(Integer)
     minute = Column(Integer)
     second = Column(Integer)
