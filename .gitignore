@@ -163,3 +163,5 @@ cython_debug/
 
 matches.db
 matches/
+
+.DS_Store
