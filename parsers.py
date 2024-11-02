@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from utils import write_file
 
 
-def parse_match_html(html_content: str, month: str) -> None:
+def parse_match_html(html_content: str, month: str, league_name: str) -> None:
     # Parse the HTML
     soup = BeautifulSoup(html_content, "lxml")
 
@@ -53,18 +53,20 @@ def parse_match_html(html_content: str, month: str) -> None:
         regions_json = json.loads(regions_str)
 
         write_file(
-            f"matches/{month}/regions_{match_id}.json", regions_json, is_json=True
+            f"matches/{league_name}/{month}/regions_{match_id}.json",
+            regions_json,
+            is_json=True,
         )
 
     write_file(
-        f"matches/{month}/formation_id_name_mappings_{match_id}.json",
+        f"matches/{league_name}/{month}/formation_id_name_mappings_{match_id}.json",
         json_data["formationIdNameMappings"],
         is_json=True,
     )
 
     if match_centre_data := json_data.get("matchCentreData"):
         write_file(
-            f"matches/{month}/match_centre_data_{match_id}.json",
+            f"matches/{league_name}/{month}/match_centre_data_{match_id}.json",
             match_centre_data,
             is_json=True,
         )
@@ -72,7 +74,18 @@ def parse_match_html(html_content: str, month: str) -> None:
         print(f"\033[91mNo 'match centre data' found for match {match_id}\033[0m")
 
     write_file(
-        f"matches/{month}/match_centre_event_type_{match_id}.json",
+        f"matches/{league_name}/{month}/match_centre_event_type_{match_id}.json",
         json_data["matchCentreEventTypeJson"],
         is_json=True,
     )
+
+
+def parse_base_url(base_url: str) -> tuple[str, str, str]:
+    league_name = base_url.split("/")[-1]
+    stage_id = base_url.split("/")[-3]
+
+    data_url = f"https://www.whoscored.com/tournaments/{stage_id}/data/?d=2024{{month:02d}}&isAggregate=false"
+    # x-month is used to indicate the month of the match in the URL for development purposes.
+    match_url = f"https://www.whoscored.com/Matches/{{match_id}}/Live/{league_name}-{{home_team}}-{{away_team}}?x-month={{month}}"
+
+    return match_url, data_url, league_name

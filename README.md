@@ -51,16 +51,21 @@ The `scrape` command allows you to scrape match data from external sources.
 And writes it to matches folder in this structure:
 ```
 matches
-├── November
-│   ├── matches.json
-│   ├── raw_html_<match_id>.html
-│   ├── match_centre_event_type_<match_id>.json
-│   ├── match_centre_data_<match_id>.json
-│   ├── formation_id_name_mapppings_<match_id>.json
-│   ├── regions_<match_id>.json
+├── England-Premier-League-2024-2025
+│   ├── November
+│   │   ├── matches.json
+│   │   ├── raw_html_<match_id>.html
+│   │   ├── match_centre_event_type_<match_id>.json
+│   │   ├── match_centre_data_<match_id>.json
+│   │   ├── formation_id_name_mapppings_<match_id>.json
+│   │   ├── regions_<match_id>.json
+│   │   └── ...
+│   ├── December
+│   │   └── ...
 │   └── ...
-├── December
-├── ...
+├── England-League-One-2024-2025
+│   ├── ...
+└── ...
 ```
 
 ## Populating Data
