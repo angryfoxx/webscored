@@ -6,7 +6,7 @@ Base = declarative_base()
 
 class IncidentEvent(Base):
     __tablename__ = "incident_event"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=False)
     event_id = Column(Integer)
     minute = Column(Integer)
     second = Column(Integer)
