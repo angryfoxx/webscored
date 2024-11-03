@@ -35,29 +35,6 @@ def parse_match_html(html_content: str, month: str, league_name: str) -> None:
     # matchId, matchCentreData, matchCentreEventTypeJson, formationIdNameMappings
     match_id = json_data["matchId"]
 
-    regions = next(filter(lambda tag: "var allRegions" in tag.text, scripts), None)
-
-    if regions:
-        regions_str = regions.text[regions.text.find("[") : regions.text.rfind("]") + 1]
-        regions_str = (
-            regions_str.replace("\n", "")
-            .replace("'", '"')
-            .replace("type:", '"type":')
-            .replace("id:", '"id":')
-            .replace("flg:", '"flg":')
-            .replace("name:", '"name":')
-            .replace("tournaments:", '"tournaments":')
-            .replace("url:", '"url":')
-            .replace("sortOrder:", '"sortOrder":')
-        )
-        regions_json = json.loads(regions_str)
-
-        write_file(
-            f"matches/{league_name}/{month}/regions_{match_id}.json",
-            regions_json,
-            is_json=True,
-        )
-
     write_file(
         f"matches/{league_name}/{month}/formation_id_name_mappings_{match_id}.json",
         json_data["formationIdNameMappings"],
@@ -76,6 +53,35 @@ def parse_match_html(html_content: str, month: str, league_name: str) -> None:
     write_file(
         f"matches/{league_name}/{month}/match_centre_event_type_{match_id}.json",
         json_data["matchCentreEventTypeJson"],
+        is_json=True,
+    )
+
+
+def parse_base_data(html_content: str) -> None:
+    soup = BeautifulSoup(html_content, "lxml")
+    scripts = soup.find_all("script")
+    regions = next(filter(lambda tag: "var allRegions" in tag.text, scripts), None)
+
+    if not regions:
+        return
+
+    regions_str = regions.text[regions.text.find("[") : regions.text.rfind("]") + 1]
+    regions_str = (
+        regions_str.replace("\n", "")
+        .replace("'", '"')
+        .replace("type:", '"type":')
+        .replace("id:", '"id":')
+        .replace("flg:", '"flg":')
+        .replace("name:", '"name":')
+        .replace("tournaments:", '"tournaments":')
+        .replace("url:", '"url":')
+        .replace("sortOrder:", '"sortOrder":')
+    )
+    regions_json = json.loads(regions_str)
+
+    write_file(
+        "matches/all_regions.json",
+        regions_json,
         is_json=True,
     )
 
