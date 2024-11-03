@@ -1,4 +1,5 @@
 import json
+import os
 
 from bs4 import BeautifulSoup
 
@@ -21,6 +22,17 @@ def parse_match_html(html_content: str, month: str, league_name: str) -> None:
     json_str = data_script.text[
         data_script.text.find("{") : data_script.text.rfind("}") + 1
     ]
+    match_id = (
+        json_str[json_str.find("matchId") : json_str.find(",")]
+        .replace(" ", "")
+        .split(":")[-1]
+    )
+
+    if "matchCentreData" not in json_str:
+        print(
+            f"\033[91mNo 'match centre data' found for match {match_id}. Month: {month} League: {league_name}\033[0m"
+        )
+        return None
 
     json_str = (
         json_str.replace("\n", "")
@@ -28,18 +40,11 @@ def parse_match_html(html_content: str, month: str, league_name: str) -> None:
         .replace("matchId", '"matchId"')
         .replace("matchCentreEventTypeJson", '"matchCentreEventTypeJson"')
         .replace("formationIdNameMappings", '"formationIdNameMappings"')
+        .replace("initialMatchDataForScrappers", '"initialMatchDataForScrappers"')
+        .replace("hasLineup", '"hasLineup"')
     )
     # Parse the corrected JSON string
     json_data = json.loads(json_str)
-
-    # matchId, matchCentreData, matchCentreEventTypeJson, formationIdNameMappings
-    match_id = json_data["matchId"]
-
-    write_file(
-        f"matches/{league_name}/{month}/formation_id_name_mappings_{match_id}.json",
-        json_data["formationIdNameMappings"],
-        is_json=True,
-    )
 
     if match_centre_data := json_data.get("matchCentreData"):
         write_file(
@@ -47,14 +52,24 @@ def parse_match_html(html_content: str, month: str, league_name: str) -> None:
             match_centre_data,
             is_json=True,
         )
-    else:
-        print(f"\033[91mNo 'match centre data' found for match {match_id}\033[0m")
 
-    write_file(
-        f"matches/{league_name}/{month}/match_centre_event_type_{match_id}.json",
-        json_data["matchCentreEventTypeJson"],
-        is_json=True,
-    )
+    if not os.path.exists(
+        f"matches/{league_name}/{month}/formation_id_name_mappings.json"
+    ):
+        write_file(
+            f"matches/{league_name}/{month}/formation_id_name_mappings.json",
+            json_data["formationIdNameMappings"],
+            is_json=True,
+        )
+
+    if not os.path.exists(
+        f"matches/{league_name}/{month}/match_centre_event_type.json"
+    ):
+        write_file(
+            f"matches/{league_name}/{month}/match_centre_event_type.json",
+            json_data["matchCentreEventTypeJson"],
+            is_json=True,
+        )
 
 
 def parse_base_data(html_content: str) -> None:
