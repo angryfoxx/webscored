@@ -35,15 +35,24 @@ python cli.py
 
 The CLI provides the following commands:
 
-- `populate`: Populate match data from a JSON file.
-- `scrape`: Scrape match data from external sources.
-- `run`: Run both tasks in sequence.
+- `populate` or `--populate`or `-p`: Populate match data from a JSON file.
+- `scrape` or `--scrape` or `-s`: Scrape match data from external sources.
+- `run` or `--run` or `-r`: Run both tasks in sequence.
+- 
+And the following options:
+
+- `--help`: Display help information for the command.
+- `--fetch-all` or `-fa`: Fetch all matches for the selected region.
+- `--all-leagues` or `-al`: Fetch all leagues for the selected region.
+- `--playwright` or `-pw`: Use Playwright to scrape data.
 
 To run a command, use the following syntax:
 
 ```bash
 python cli.py <command>
 ```
+
+If you don't provide a option, the CLI will prompt you to select region and league.
 
 ## Scraping Data
 
@@ -64,7 +73,9 @@ matches
 │   │   └── ...
 │   └── ...
 ├── England-League-One-2024-2025
-│   ├── ...
+│   └── ...
+├── tournament_url_mapping.json
+├── all_regions.json
 └── ...
 ```
 

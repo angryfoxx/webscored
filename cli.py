@@ -1,77 +1,198 @@
-import argparse
 import asyncio
-import re
+import json
+import os
+import random
+
+import asyncclick as click
+import pydash
 
 from populate import populate_incident_events
-from scraper import get_matches_by_month
+from scraper import fetch_base_data, get_matches_by_month
+from utils import find_valid_urls
 
 
-async def scrape(url: str):
+def find_possible_regions(search_term):
+    return pydash.filter_(REGIONS, lambda region: search_term.lower() in region.lower())
+
+
+def display_regions(regions):
+    regions = regions[:5]
+    for i, region in enumerate(regions, start=1):
+        click.echo(f"\033[96m{i}. {region}\033[0m")
+
+    click.echo()
+
+
+async def scrape_url(url: str, playwright: bool = False):
     """Runs the scraping function asynchronously to fetch matches by month."""
 
     print("\033[93mFetching matches...\033[0m")
 
-    await get_matches_by_month(url)
+    if playwright:
+        # TODO: Implement Playwright scraping
+        ...
+    else:
+        await get_matches_by_month(url)
 
     print(
         "\033[92mFetching matches completed! You can find the matches in the matches folder."
     )
 
 
-def validate_url(url: str) -> None:
-    """Validates the URL to ensure it is a valid URL."""
+def find_tournament_url(all_leagues) -> list[str]:
+    while True:
+        # default to 5 random regions
+        selected_regions = random.sample(REGIONS, 5)
 
-    pattern = r"^https://www\.whoscored\.com/Regions/\d+/Tournaments/\d+/Seasons/\d+/Stages/\d+/Fixtures/[^/]+$"
-    if not re.match(pattern, url):
-        raise argparse.ArgumentTypeError(
-            "Invalid URL. Please provide a valid URL."
-            " Example: https://www.whoscored.com/Regions/252/Tournaments/2/Seasons/10316/Stages/23400/Fixtures/England-Premier-League-2024-2025"
+        search_term = click.prompt(
+            "\033[94mEnter country name to search or press Enter to select from the list\033[0m",
+            default="",
+            show_default=False,
         )
 
+        if search_term:
+            selected_regions = find_possible_regions(search_term)
+            if not selected_regions:
+                click.echo("\033[91mNo regions found. Please try again.\033[0m")
+                continue
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="CLI for populating, scraping, and running both tasks."
-    )
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+        display_regions(selected_regions)
 
-    subparsers.add_parser("populate", help="Populate the database from a JSON file.")
-    scrape_parser = subparsers.add_parser(
-        "scrape", help="Scrape data from an external source."
-    )
-    scrape_parser.add_argument(
-        "--url",
-        type=str,
-        required=True,
-        help="URL to fetch matches from.",
-    )
-    run_parser = subparsers.add_parser(
-        "run", help="Execute both scrape and populate in order."
-    )
-    run_parser.add_argument(
-        "--url",
-        type=str,
-        required=True,
-        help="URL to fetch matches from.",
+        try:
+            region_choice = int(click.prompt("\033[94mEnter the region number\033[0m"))
+            if region_choice < 1 or region_choice > len(selected_regions):
+                click.echo("\033[91mInvalid choice. Please try again.\033[0m\n")
+                continue
+        except ValueError:
+            click.echo("\033[91mInvalid choice. Please try again.\033[0m\n")
+            continue
+
+        click.echo(
+            f"\033[92mSelected region: {selected_regions[region_choice - 1]}\033[0m\n"
+        )
+
+        selected_region_data = pydash.find(
+            REGION_DATA,
+            lambda region: region["name"] == selected_regions[region_choice - 1],
+        )
+
+        if all_leagues:
+            click.echo("\033[92mSelected all leagues.\033[0m")
+            league_urls = [
+                f"https://www.whoscored.com{league['url']}"
+                for league in selected_region_data.get("tournaments", [])
+            ]
+            return league_urls
+
+        # Select League within Region
+        click.echo("\033[94mSelect a league:\033[0m")
+        leagues = selected_region_data.get("tournaments", [])
+        for i, league in enumerate(leagues, start=1):
+            click.echo(f"\033[96m{i}. {league['name']}\033[0m")
+        click.echo()
+
+        league_choice = click.prompt("\033[94mEnter the league number\033[0m", type=int)
+        if league_choice < 1 or league_choice > len(leagues):
+            click.echo("\033[91mInvalid choice. Please try again.\033[0m\n")
+            continue
+
+        selected_league = leagues[league_choice - 1]
+        click.echo(f"\033[92mSelected league: {selected_league['name']}\033[0m")
+
+        league_url = f"https://www.whoscored.com{selected_league['url']}"
+        return [league_url]
+
+
+def get_all_tournaments_urls():
+    urls = []
+    for region in REGION_DATA:
+        for league in region["tournaments"]:
+            urls.append(f"https://www.whoscored.com{league['url']}")
+    return urls
+
+
+def get_urls(tournament_urls):
+    with open("matches/tournament_url_mapping.json", "r", encoding="utf-8") as f:
+        tournament_url_mapping = json.load(f)
+    urls = [tournament_url_mapping[url] for url in tournament_urls]
+    return urls
+
+
+@click.command()
+@click.option(
+    "--fetch-all",
+    "-fa",
+    is_flag=True,
+    help="Select all regions.",
+)
+@click.option(
+    "--all-leagues",
+    "-al",
+    is_flag=True,
+    help="Select all leagues.",
+)
+@click.option(
+    "--playwright",
+    "-pw",
+    is_flag=True,
+    help="Use Playwright for scraping.",
+)
+@click.option(
+    "populate",
+    "--populate",
+    "-p",
+    is_flag=True,
+    help="Populate the database from a JSON file.",
+)
+@click.option(
+    "scrape",
+    "--scrape",
+    "-s",
+    is_flag=True,
+    help="Scrape data from an external source.",
+)
+@click.option(
+    "run",
+    "--run",
+    "-r",
+    is_flag=True,
+    help="Execute both scrape and populate in order.",
+)
+async def cli(fetch_all, all_leagues, playwright, populate, scrape, run):
+    base_urls = (
+        get_all_tournaments_urls() if fetch_all else find_tournament_url(all_leagues)
     )
 
-    args = parser.parse_args()
+    await find_valid_urls(base_urls)
+    urls = get_urls(base_urls)
 
-    url = getattr(args, "url", None)
-    if url:
-        validate_url(url)
-
-    if args.command == "populate":
+    if populate:
         populate_incident_events()
-    elif args.command == "scrape":
-        asyncio.run(scrape(url))
-    elif args.command == "run":
-        # Run scrape first, then populate
-        asyncio.run(scrape(url))
+    elif scrape:
+        for url in urls:
+            click.echo(f"\033[93mScraping data from {url}...\033[0m")
+            await scrape_url(url, playwright)
+    elif run:
+        for url in urls:
+            click.echo(f"\033[93mScraping data from {url}...\033[0m")
+            await scrape_url(url, playwright)
         populate_incident_events()
     else:
-        parser.print_help()
+        click.echo("\033[91mPlease select an option.\033[0m")
 
 
 if __name__ == "__main__":
-    main()
+    if not os.path.exists("matches"):
+        os.makedirs("matches")
+
+    if not os.path.exists("matches/all_regions.json"):
+        click.echo("\033[93mBase data not found. Fetching base data...\033[0m")
+        fetch_base_data()
+        click.echo("\033[92mBase data fetched successfully!\033[0m")
+
+    with open("matches/all_regions.json", "r", encoding="utf-8") as file:
+        REGION_DATA = json.load(file)
+
+    REGIONS = [region["name"] for region in REGION_DATA]
+
+    asyncio.run(cli())
