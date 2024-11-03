@@ -6,6 +6,7 @@ import random
 import asyncclick as click
 import pydash
 
+from logger import logger
 from populate import populate_incident_events
 from scraper import fetch_base_data, get_matches_by_month
 from utils import find_valid_urls
@@ -26,15 +27,14 @@ def display_regions(regions):
 async def scrape_url(url: str, playwright: bool = False):
     """Runs the scraping function asynchronously to fetch matches by month."""
 
-    print("\033[93mFetching matches...\033[0m")
-
+    click.echo("\033[93mFetching matches...\033[0m")
     if playwright:
         # TODO: Implement Playwright scraping
         ...
     else:
         await get_matches_by_month(url)
 
-    print(
+    click.echo(
         "\033[92mFetching matches completed! You can find the matches in the matches folder."
     )
 
@@ -159,6 +159,11 @@ def get_urls(tournament_urls):
     help="Execute both scrape and populate in order.",
 )
 async def cli(fetch_all, all_leagues, playwright, populate, scrape, run):
+    if populate:
+        populate_incident_events()
+        click.echo("\033[92mDatabase populated successfully!\033[0m")
+        return
+
     base_urls = (
         get_all_tournaments_urls() if fetch_all else find_tournament_url(all_leagues)
     )
@@ -166,15 +171,15 @@ async def cli(fetch_all, all_leagues, playwright, populate, scrape, run):
     await find_valid_urls(base_urls)
     urls = get_urls(base_urls)
 
-    if populate:
-        populate_incident_events()
-    elif scrape:
+    if scrape:
         for url in urls:
             click.echo(f"\033[93mScraping data from {url}...\033[0m")
+            logger.info(f"Scraping data from {url}")
             await scrape_url(url, playwright)
     elif run:
         for url in urls:
             click.echo(f"\033[93mScraping data from {url}...\033[0m")
+            logger.info(f"Scraping data from {url}")
             await scrape_url(url, playwright)
         populate_incident_events()
     else:

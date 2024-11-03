@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 
 from utils import write_file
 
+from logger import logger
+
 
 def parse_match_html(html_content: str, month: str, league_name: str) -> None:
     # Parse the HTML
@@ -29,8 +31,8 @@ def parse_match_html(html_content: str, month: str, league_name: str) -> None:
     )
 
     if "matchCentreData" not in json_str:
-        print(
-            f"\033[91mNo 'match centre data' found for match {match_id}. Month: {month} League: {league_name}\033[0m"
+        logger.error(
+            f"No 'match centre data' found for match {match_id}. Month: {month} League: {league_name}"
         )
         return None
 

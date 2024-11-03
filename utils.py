@@ -6,7 +6,7 @@ import os
 import httpx
 from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm
-
+from logger import logger
 HEADERS = {
     "Dnt": "1",
     "Priority": "u=0, i",
@@ -24,7 +24,7 @@ async def fetch_url(client, url: str, retry: int = 0) -> bytes:
         if retry < 3:
             await asyncio.sleep(1)
             return await fetch_url(client, url, retry=retry + 1)
-        print(f"Failed to fetch {url}")
+        logger.error("Failed to fetch %s after 3 retries", url)
         return b""
 
     try:
@@ -49,7 +49,7 @@ async def find_valid_urls(tournament_urls: list[str]) -> None:
 
     We need to find full URLs that contain season id and stage id.
     """
-    print("\033[93mFinding valid URLs...\033[0m")
+    logger.info("Finding valid URLs...")
     tournament_url_mapping = {}
 
     if os.path.exists("matches/tournament_url_mapping.json"):
@@ -76,7 +76,7 @@ async def find_valid_urls(tournament_urls: list[str]) -> None:
             soup = BeautifulSoup(response, "lxml")
             canonical_link = soup.find("link", {"rel": "canonical"})
             if not canonical_link:
-                print(f"\033[91mNo valid link found for {url}\033[0m")
+                logger.error("No valid link found for %s", url)
                 continue
 
             valid_url = canonical_link["href"]

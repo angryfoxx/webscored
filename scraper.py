@@ -10,7 +10,7 @@ import tqdm
 
 from parsers import parse_base_data, parse_base_url, parse_match_html
 from utils import HEADERS, fetch_url, write_file
-
+from logger import logger
 
 def fetch_base_data(retry: int = 0) -> None:
     """Save all regions and top matches to a JSON file.
@@ -22,6 +22,7 @@ def fetch_base_data(retry: int = 0) -> None:
         if retry < 3:
             time.sleep(1)
             return fetch_base_data(retry=retry + 1)
+        logger.error("Failed to fetch base data after 3 retries. url: https://www.whoscored.com/")
         raise Exception("Failed to fetch base data")
 
     client = httpx.Client(headers=HEADERS)

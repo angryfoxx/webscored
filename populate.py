@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from tqdm import tqdm
 
 from constants import DATABASE_URI
+from logger import logger
 from models import Base, IncidentEvent
 from utils import find_match_files
 
@@ -12,16 +13,16 @@ from utils import find_match_files
 def populate_incident_events():
     json_files = find_match_files()
     if not json_files:
-        print(
-            "\033[91mNo JSON files found in the matches folder. Please scrape data first.\033[0m"
+        logger.error(
+            "No JSON files found in the matches folder. Please scrape data first."
         )
         return
 
-    print("\033[93mPopulating incident events...\033[0m")
-    print(f"\033[93m{len(json_files)} files found\033[0m")
+    logger.info("Populating incident events...")
+    logger.info(f"{len(json_files)} files found")
 
     engine = create_engine(DATABASE_URI)
-    print("\033[93mConnected to the database!\033[0m")
+    logger.info("Connected to the database!")
 
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -44,6 +45,9 @@ def populate_incident_events():
 
     existing_incident_event_ids = set(
         ie_id for ie_id, in session.query(IncidentEvent.id).all()
+    )
+    logger.info(
+        f"{len(existing_incident_event_ids)} existing incident events found. Skipping them..."
     )
 
     for event in tqdm(incident_events, desc="Populating incident events"):
@@ -85,4 +89,4 @@ def populate_incident_events():
         session.add(incident_event)
 
     session.commit()
-    print("\033[92mIncident events have been populated successfully!\033[0m")
+    logger.info("Incident events have been populated successfully!")
