@@ -6,7 +6,9 @@ import os
 import httpx
 from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm
+
 from logger import logger
+
 HEADERS = {
     "Dnt": "1",
     "Priority": "u=0, i",
@@ -87,8 +89,16 @@ async def find_valid_urls(tournament_urls: list[str]) -> None:
         )
 
 
-def find_match_files():
+def find_incident_event_files():
     pattern = os.path.join("matches", "**", "match_centre_data_*.json")
+
+    match_files = glob.glob(pattern, recursive=True)
+
+    return match_files
+
+
+def find_match_files():
+    pattern = os.path.join("matches", "**", "matches.json")
 
     match_files = glob.glob(pattern, recursive=True)
 

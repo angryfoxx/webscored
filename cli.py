@@ -10,7 +10,7 @@ from alembic.config import Config
 
 from constants import DATABASE_URI
 from logger import logger
-from populate import populate_incident_events
+from populate import populate_data
 from scraper import fetch_base_data, get_matches_by_month
 from utils import find_valid_urls
 
@@ -163,7 +163,7 @@ def get_urls(tournament_urls):
 )
 async def cli(fetch_all, all_leagues, playwright, populate, scrape, run):
     if populate:
-        populate_incident_events()
+        populate_data()
         click.echo("\033[92mDatabase populated successfully!\033[0m")
         return
 
@@ -184,7 +184,7 @@ async def cli(fetch_all, all_leagues, playwright, populate, scrape, run):
             click.echo(f"\033[93mScraping data from {url}...\033[0m")
             logger.info(f"Scraping data from {url}")
             await scrape_url(url, playwright)
-        populate_incident_events()
+        populate_data()
     else:
         click.echo("\033[91mPlease select an option.\033[0m")
 

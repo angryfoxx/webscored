@@ -13,7 +13,7 @@ error_handler.setLevel(logging.ERROR)  # Logs ERROR and higher to error.log
 
 
 # Create formatters and add them to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 info_handler.setFormatter(formatter)
 error_handler.setFormatter(formatter)
 

@@ -1,31 +1,31 @@
 import json
+from datetime import datetime
 
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from tqdm import tqdm
 
 from constants import DATABASE_URI
 from logger import logger
-from models import Base, IncidentEvent
-from utils import find_match_files
+from models import Bet, Incident, IncidentEvent, Match, Team, Tournament
+from utils import find_incident_event_files, find_match_files
+
+engine = create_engine(DATABASE_URI)
+Session = sessionmaker(bind=engine)
+session = Session()
 
 
 def populate_incident_events():
-    json_files = find_match_files()
+    logger.info("Populating incident events...")
+
+    json_files = find_incident_event_files()
     if not json_files:
         logger.error(
             "No JSON files found in the matches folder. Please scrape data first."
         )
         return
 
-    logger.info("Populating incident events...")
     logger.info(f"{len(json_files)} files found")
-
-    engine = create_engine(DATABASE_URI)
-    logger.info("Connected to the database!")
-
-    Session = sessionmaker(bind=engine)
-    session = Session()
 
     # Get existing incident event IDs to avoid duplicates
     existing_incident_event_ids = set(
@@ -106,5 +106,137 @@ def populate_incident_events():
     logger.info("Incident events have been populated successfully!")
 
 
-if __name__ == "__main__":
+def load_data():
+    logger.info("Population matches data...")
+
+    json_files = find_match_files()
+    data = []
+    for json_file in json_files:
+        with open(json_file, "r", encoding="utf-8") as file:
+            try:
+                json_data = json.load(file)
+                data.extend(json_data)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to load {json_file}: {e}")
+                continue
+
+    logger.info(f"{len(data)} files found")
+
+    # Preprocess data to collect all records
+    tournaments = {}
+    teams = {}
+    matches = []
+    incidents = []
+    bets = []
+
+    existing_tournament_ids = set(t_id for t_id, in session.query(Tournament.id).all())
+    existing_match_ids = set(m_id for m_id, in session.query(Match.id).all())
+
+    logger.info(
+        f"{len(existing_tournament_ids)} existing tournaments found. Skipping duplicates..."
+    )
+    logger.info(
+        f"{len(existing_match_ids)} existing matches found. Skipping duplicates..."
+    )
+
+    for tournament_data in tqdm(data, desc="Loading matches..."):
+        # Collect tournaments
+        tournament_id = tournament_data["tournamentId"]
+        if (
+            tournament_id not in tournaments
+            and tournament_id not in existing_tournament_ids
+        ):
+            tournaments[tournament_id] = Tournament(
+                id=tournament_id,
+                name=tournament_data["tournamentName"],
+                season_name=tournament_data["seasonName"],
+                region_name=tournament_data["regionName"],
+                region_id=tournament_data["regionId"],
+            )
+
+        for match_data in tournament_data["matches"]:
+            match_id = match_data["id"]
+            if match_id in existing_match_ids:
+                continue
+
+            # Collect teams
+            home_team_id = match_data["homeTeamId"]
+            if home_team_id not in teams:
+                teams[home_team_id] = Team(
+                    id=home_team_id,
+                    name=match_data["homeTeamName"],
+                    country_code=match_data["homeTeamCountryCode"],
+                    country_name=match_data["homeTeamCountryName"],
+                )
+
+            away_team_id = match_data["awayTeamId"]
+            if away_team_id not in teams:
+                teams[away_team_id] = Team(
+                    id=away_team_id,
+                    name=match_data["awayTeamName"],
+                    country_code=match_data["awayTeamCountryCode"],
+                    country_name=match_data["awayTeamCountryName"],
+                )
+
+            # Collect matches
+            match = Match(
+                id=match_id,
+                stage_id=match_data["stageId"],
+                tournament_id=tournament_id,
+                home_team_id=home_team_id,
+                away_team_id=away_team_id,
+                start_time=datetime.fromisoformat(
+                    match_data["startTimeUtc"].replace("Z", "+00:00")
+                ),
+                status=match_data["status"],
+                home_score=match_data["homeScore"],
+                away_score=match_data["awayScore"],
+                period=match_data["period"],
+            )
+            matches.append(match)
+
+            # Collect incidents
+            for incident_data in match_data.get("incidents", []) or []:
+                incident = Incident(
+                    match_id=match_id,
+                    minute=int(incident_data["minute"]),
+                    type=incident_data["type"],
+                    sub_type=incident_data["subType"],
+                    player_name=incident_data["playerName"],
+                    participating_player_name=incident_data.get(
+                        "participatingPlayerName"
+                    ),
+                    field=incident_data["field"],
+                    period=incident_data["period"],
+                )
+                incidents.append(incident)
+
+            # Collect bets
+            bets_data = match_data.get("bets", {}) or {}
+            for bet_type, bet_data in bets_data.items():
+                for offer in bet_data["offers"]:
+                    bet = Bet(
+                        match_id=match_id,
+                        bet_name=bet_data["betName"],
+                        odds_decimal=float(offer["oddsDecimal"]),
+                        odds_fractional=offer["oddsFractional"],
+                        provider_id=offer["providerId"],
+                        click_out_url=offer["clickOutUrl"],
+                    )
+                    bets.append(bet)
+
+    # Bulk insert all records
+    session.bulk_save_objects(tournaments.values())
+    session.bulk_save_objects(teams.values())
+    session.bulk_save_objects(matches)
+    session.bulk_save_objects(incidents)
+    session.bulk_save_objects(bets)
+    session.commit()
+    logger.info("Data has been loaded successfully!")
+
+
+def populate_data():
+    logger.info("Starting data population...")
+    load_data()
     populate_incident_events()
+    logger.info("Data population has been completed successfully!")
