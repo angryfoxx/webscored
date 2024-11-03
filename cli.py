@@ -5,7 +5,10 @@ import random
 
 import asyncclick as click
 import pydash
+from alembic import command
+from alembic.config import Config
 
+from constants import DATABASE_URI
 from logger import logger
 from populate import populate_incident_events
 from scraper import fetch_base_data, get_matches_by_month
@@ -35,7 +38,7 @@ async def scrape_url(url: str, playwright: bool = False):
         await get_matches_by_month(url)
 
     click.echo(
-        "\033[92mFetching matches completed! You can find the matches in the matches folder."
+        "\033[92mFetching matches completed! You can find the matches in the matches folder.\033[0m"
     )
 
 
@@ -186,6 +189,41 @@ async def cli(fetch_all, all_leagues, playwright, populate, scrape, run):
         click.echo("\033[91mPlease select an option.\033[0m")
 
 
+def database_exists():
+    if DATABASE_URI.startswith("sqlite:///"):
+        # For SQLite, check if the database file exists
+        db_path = DATABASE_URI.replace("sqlite:///", "")
+        return os.path.exists(db_path)
+    else:
+        # For other databases, attempt to connect
+        from sqlalchemy import create_engine
+
+        engine = create_engine(DATABASE_URI)
+        try:
+            with engine.connect():
+                return True
+        except Exception:
+            return False
+
+
+def apply_migrations():
+    alembic_cfg = Config("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
+
+
+def init_db():
+    """Initialize the database and apply migrations if needed."""
+    if database_exists():
+        logger.info("Database already exists. Applying migrations...")
+    else:
+        logger.info(
+            "Database does not exist. Creating database and applying migrations..."
+        )
+
+    apply_migrations()
+    click.echo("Database is up-to-date with latest migrations.")
+
+
 if __name__ == "__main__":
     if not os.path.exists("matches"):
         os.makedirs("matches")
@@ -199,5 +237,7 @@ if __name__ == "__main__":
         REGION_DATA = json.load(file)
 
     REGIONS = [region["name"] for region in REGION_DATA]
+
+    init_db()
 
     asyncio.run(cli())

@@ -27,66 +27,84 @@ def populate_incident_events():
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    if not inspect(engine).has_table("incident_event"):
-        Base.metadata.create_all(engine)
-
-    incident_events = []
-    for json_file in json_files:
-        with open(json_file, "r", encoding="utf-8") as file:
-            try:
-                data = json.load(file)
-            except json.JSONDecodeError:
-                continue
-            if not data:
-                continue
-
-            incident_events.extend(data.get("home", {}).get("incidentEvents", []))
-            incident_events.extend(data.get("away", {}).get("incidentEvents", []))
-
+    # Get existing incident event IDs to avoid duplicates
     existing_incident_event_ids = set(
         ie_id for ie_id, in session.query(IncidentEvent.id).all()
     )
     logger.info(
-        f"{len(existing_incident_event_ids)} existing incident events found. Skipping them..."
+        f"{len(existing_incident_event_ids)} existing incident events found. Skipping duplicates..."
     )
 
-    for event in tqdm(incident_events, desc="Populating incident events"):
-        idx = int(event.get("id"))
-        if idx in existing_incident_event_ids:
-            continue
+    new_incident_events = []
 
-        incident_event = IncidentEvent(
-            id=idx,
-            event_id=event.get("eventId"),
-            minute=event.get("minute"),
-            second=event.get("second"),
-            team_id=event.get("teamId"),
-            player_id=event.get("playerId"),
-            x=event.get("x"),
-            y=event.get("y"),
-            expanded_minute=event.get("expandedMinute"),
-            period_value=event.get("period", {}).get("value"),
-            period_display_name=event.get("period", {}).get("displayName"),
-            type_value=event.get("type", {}).get("value"),
-            type_display_name=event.get("type", {}).get("displayName"),
-            outcome_type_value=event.get("outcomeType", {}).get("value"),
-            outcome_type_display_name=event.get("outcomeType", {}).get("displayName"),
-            qualifiers=event.get("qualifiers", []),
-            satisfied_events_types=event.get("satisfiedEventsTypes", []),
-            is_touch=event.get("isTouch", False),
-            end_x=event.get("endX"),
-            end_y=event.get("endY"),
-            goal_mouth_x=event.get("goalMouthX"),
-            goal_mouth_y=event.get("goalMouthY"),
-            related_event_id=event.get("relatedEventId"),
-            related_player_id=event.get("relatedPlayerId"),
-            card_type_value=event.get("cardType", {}).get("value"),
-            card_type_display_name=event.get("cardType", {}).get("displayName"),
-            is_goal=event.get("isGoal", False),
-            is_shot=event.get("isShot", False),
-        )
+    for json_file in tqdm(json_files, desc="Populating incident events"):
+        with open(json_file, "r", encoding="utf-8") as file:
+            try:
+                data = json.load(file)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to load {json_file}: {e}")
+                continue
 
-        session.add(incident_event)
+            incident_events = data.get("home", {}).get("incidentEvents", []) + data.get(
+                "away", {}
+            ).get("incidentEvents", [])
 
-    session.commit()
+        match_id = json_file.split("_")[-1].split(".")[0]
+
+        for event in incident_events:
+            idx = int(event.get("id"))
+            if idx in existing_incident_event_ids:
+                continue
+
+            incident_event = IncidentEvent(
+                id=idx,
+                event_id=event.get("eventId"),
+                match_id=match_id,
+                minute=event.get("minute"),
+                second=event.get("second"),
+                team_id=event.get("teamId"),
+                player_id=event.get("playerId"),
+                x=event.get("x"),
+                y=event.get("y"),
+                expanded_minute=event.get("expandedMinute"),
+                period_value=event.get("period", {}).get("value"),
+                period_display_name=event.get("period", {}).get("displayName"),
+                type_value=event.get("type", {}).get("value"),
+                type_display_name=event.get("type", {}).get("displayName"),
+                outcome_type_value=event.get("outcomeType", {}).get("value"),
+                outcome_type_display_name=event.get("outcomeType", {}).get(
+                    "displayName"
+                ),
+                qualifiers=event.get("qualifiers", []),
+                satisfied_events_types=event.get("satisfiedEventsTypes", []),
+                is_touch=event.get("isTouch", False),
+                end_x=event.get("endX"),
+                end_y=event.get("endY"),
+                goal_mouth_x=event.get("goalMouthX"),
+                goal_mouth_y=event.get("goalMouthY"),
+                related_event_id=event.get("relatedEventId"),
+                related_player_id=event.get("relatedPlayerId"),
+                card_type_value=event.get("cardType", {}).get("value"),
+                card_type_display_name=event.get("cardType", {}).get("displayName"),
+                is_goal=event.get("isGoal", False),
+                is_shot=event.get("isShot", False),
+            )
+
+            new_incident_events.append(incident_event)
+            existing_incident_event_ids.add(idx)
+
+        # Commit in batches of 1000 to optimize database interaction
+        if len(new_incident_events) >= 1000:
+            session.bulk_save_objects(new_incident_events)
+            session.commit()
+            new_incident_events.clear()
+
+    if new_incident_events:
+        session.bulk_save_objects(new_incident_events)
+        session.commit()
+
     logger.info("Incident events have been populated successfully!")
+
+
+if __name__ == "__main__":
+    populate_incident_events()
