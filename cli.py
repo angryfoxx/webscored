@@ -11,7 +11,11 @@ from alembic.config import Config
 from constants import DATABASE_URI
 from logger import logger
 from populate import populate_data
-from scraper import fetch_base_data, get_matches_by_month
+from scraper import (
+    fetch_base_data,
+    get_matches_by_month,
+    update_matches_by_recent_matches,
+)
 from utils import find_valid_urls
 
 
@@ -161,10 +165,25 @@ def get_urls(tournament_urls):
     is_flag=True,
     help="Execute both scrape and populate in order.",
 )
-async def cli(fetch_all, all_leagues, playwright, populate, scrape, run):
+@click.option(
+    "--fetch-recent",
+    "-fr",
+    is_flag=True,
+    help="Fetch today's matches.",
+)
+async def cli(fetch_all, all_leagues, playwright, populate, scrape, run, fetch_recent):
     if populate:
         populate_data()
         click.echo("\033[92mDatabase populated successfully!\033[0m")
+        return
+
+    if fetch_recent:
+        logger.info("Fetching recent matches...")
+        await update_matches_by_recent_matches()
+        populate_data()
+        click.echo(
+            "\033[92mRecent matches fetched and database populated successfully!\033[0m"
+        )
         return
 
     base_urls = (

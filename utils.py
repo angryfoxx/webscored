@@ -63,10 +63,14 @@ async def find_valid_urls(tournament_urls: list[str]) -> None:
     tournament_urls = tuple(
         filter(lambda url: url not in tournament_url_mapping, tournament_urls)
     )
+    if not tournament_urls:
+        return
 
     async with httpx.AsyncClient(headers=HEADERS) as client:
-        tasks = [fetch_url(client, url) for url in tournament_urls]
-        responses = await asyncio.gather(*tasks)
+        responses = []
+        for url in tqdm(tournament_urls, desc="Finding valid URLs"):
+            response = await fetch_url(client, url)
+            responses.append(response)
 
         for response, url in tqdm(
             zip(responses, tournament_urls),
@@ -98,7 +102,7 @@ def find_incident_event_files():
 
 
 def find_match_files():
-    pattern = os.path.join("matches", "**", "matches.json")
+    pattern = os.path.join("matches", "**", "matches*.json")
 
     match_files = glob.glob(pattern, recursive=True)
 

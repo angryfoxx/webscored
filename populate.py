@@ -1,18 +1,12 @@
 import json
 from datetime import datetime
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from tqdm import tqdm
 
-from constants import DATABASE_URI
+from database import SessionLocal
 from logger import logger
 from models import Bet, Incident, IncidentEvent, Match, Team, Tournament
 from utils import find_incident_event_files, find_match_files
-
-engine = create_engine(DATABASE_URI)
-Session = sessionmaker(bind=engine)
-session = Session()
 
 
 def populate_incident_events():
@@ -25,7 +19,9 @@ def populate_incident_events():
         )
         return
 
-    logger.info(f"{len(json_files)} files found")
+    logger.info(f"{len(json_files)} existing incident event files found.")
+
+    session = SessionLocal()
 
     # Get existing incident event IDs to avoid duplicates
     existing_incident_event_ids = set(
@@ -129,14 +125,19 @@ def load_data():
     incidents = []
     bets = []
 
+    session = SessionLocal()
     existing_tournament_ids = set(t_id for t_id, in session.query(Tournament.id).all())
     existing_match_ids = set(m_id for m_id, in session.query(Match.id).all())
+    existing_team_ids = set(t_id for t_id, in session.query(Team.id).all())
 
     logger.info(
         f"{len(existing_tournament_ids)} existing tournaments found. Skipping duplicates..."
     )
     logger.info(
         f"{len(existing_match_ids)} existing matches found. Skipping duplicates..."
+    )
+    logger.info(
+        f"{len(existing_team_ids)} existing teams found. Skipping duplicates..."
     )
 
     for tournament_data in tqdm(data, desc="Loading matches..."):
@@ -161,7 +162,7 @@ def load_data():
 
             # Collect teams
             home_team_id = match_data["homeTeamId"]
-            if home_team_id not in teams:
+            if home_team_id not in existing_team_ids:
                 teams[home_team_id] = Team(
                     id=home_team_id,
                     name=match_data["homeTeamName"],
@@ -170,7 +171,7 @@ def load_data():
                 )
 
             away_team_id = match_data["awayTeamId"]
-            if away_team_id not in teams:
+            if away_team_id not in existing_team_ids:
                 teams[away_team_id] = Team(
                     id=away_team_id,
                     name=match_data["awayTeamName"],
@@ -214,7 +215,11 @@ def load_data():
             # Collect bets
             bets_data = match_data.get("bets", {}) or {}
             for bet_type, bet_data in bets_data.items():
-                for offer in bet_data["offers"]:
+                if not bet_data:
+                    continue
+
+                offers = bet_data.get("offers", []) or []
+                for offer in offers:
                     bet = Bet(
                         match_id=match_id,
                         bet_name=bet_data["betName"],
