@@ -42,9 +42,17 @@ def populate_incident_events():
             incident_events.extend(data.get("home", {}).get("incidentEvents", []))
             incident_events.extend(data.get("away", {}).get("incidentEvents", []))
 
+    existing_incident_event_ids = set(
+        ie_id for ie_id, in session.query(IncidentEvent.id).all()
+    )
+
     for event in tqdm(incident_events, desc="Populating incident events"):
+        idx = int(event.get("id"))
+        if idx in existing_incident_event_ids:
+            continue
+
         incident_event = IncidentEvent(
-            id=int(event.get("id")),
+            id=idx,
             event_id=event.get("eventId"),
             minute=event.get("minute"),
             second=event.get("second"),
