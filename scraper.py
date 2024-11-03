@@ -23,7 +23,9 @@ def fetch_base_data(retry: int = 0) -> None:
         if retry < 3:
             time.sleep(1)
             return fetch_base_data(retry=retry + 1)
-        logger.error("Failed to fetch base data after 3 retries. url: https://www.whoscored.com/")
+        logger.error(
+            "Failed to fetch base data after 3 retries. url: https://www.whoscored.com/"
+        )
         raise Exception("Failed to fetch base data")
 
     client = httpx.Client(headers=HEADERS)
@@ -128,8 +130,7 @@ async def update_matches_by_recent_matches() -> None:
     limits = httpx.Limits(max_keepalive_connections=10, max_connections=20)
     async with httpx.AsyncClient(headers=HEADERS, limits=limits) as client:
         responses = await asyncio.gather(
-            fetch_url(client, today_url),
-            fetch_url(client, yesterday_url)
+            fetch_url(client, today_url), fetch_url(client, yesterday_url)
         )
 
     with open("matches/all_regions.json", "r", encoding="utf-8") as file:
