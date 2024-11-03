@@ -90,7 +90,7 @@ def find_matches_url_by_tournaments(
     return match_urls
 
 
-async def get_matches_by_month(base_url: str) -> list[str]:
+async def get_matches_by_month(base_url: str) -> None:
     base_match_url, base_data_url, league_name = parse_base_url(base_url)
 
     limits = httpx.Limits(max_keepalive_connections=10, max_connections=20)
@@ -114,5 +114,3 @@ async def get_matches_by_month(base_url: str) -> list[str]:
         write_file(f"matches/{league_name}/{month}/raw_html_{match_id}.html", content)
 
         parse_match_html(content, month, league_name)
-
-    return html_contents
