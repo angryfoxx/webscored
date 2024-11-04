@@ -38,13 +38,14 @@ The CLI provides the following commands:
 - `--populate`or `-p`: Populate match data from a JSON file.
 - `--scrape` or `-s`: Scrape match data from external sources.
 - `--run` or `-r`: Run both tasks in sequence.
-- 
+- `--fetch-recent` or `-fr`: Fetch recent matches for the selected region.
+
 And the following options:
 
 - `--help`: Display help information for the command.
 - `--fetch-all` or `-fa`: Fetch all matches for the selected region.
 - `--all-leagues` or `-al`: Fetch all leagues for the selected region.
-- `--playwright` or `-pw`: Use Playwright to scrape data.
+- `--playwright` or `-pw`: Use Playwright to scrape data. This option is available for the `scrape`, `run`, and `fetch-recent` commands.
 Do not forget to install Playwright dependencies if you want to use this option.
 ```
 playwright install
