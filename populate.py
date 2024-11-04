@@ -19,7 +19,7 @@ def populate_incident_events():
         )
         return
 
-    logger.info(f"{len(json_files)} existing incident event files found.")
+    logger.info(f"{len(json_files)} incident event files found.")
 
     session = SessionLocal()
 
@@ -160,6 +160,8 @@ def load_data():
             if match_id in existing_match_ids:
                 continue
 
+            existing_match_ids.add(match_id)
+
             # Collect teams
             home_team_id = match_data["homeTeamId"]
             if home_team_id not in existing_team_ids:
@@ -169,6 +171,7 @@ def load_data():
                     country_code=match_data["homeTeamCountryCode"],
                     country_name=match_data["homeTeamCountryName"],
                 )
+                existing_team_ids.add(home_team_id)
 
             away_team_id = match_data["awayTeamId"]
             if away_team_id not in existing_team_ids:
@@ -178,6 +181,7 @@ def load_data():
                     country_code=match_data["awayTeamCountryCode"],
                     country_name=match_data["awayTeamCountryName"],
                 )
+                existing_team_ids.add(away_team_id)
 
             # Collect matches
             match = Match(
