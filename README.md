@@ -69,10 +69,9 @@ matches
 │   ├── November
 │   │   ├── matches.json
 │   │   ├── raw_html_<match_id>.html
-│   │   ├── match_centre_event_type_<match_id>.json
+│   │   ├── match_centre_event_type.json
 │   │   ├── match_centre_data_<match_id>.json
-│   │   ├── formation_id_name_mapppings_<match_id>.json
-│   │   ├── regions_<match_id>.json
+│   │   ├── formation_id_name_mapppings.json
 │   │   └── ...
 │   ├── December
 │   │   └── ...
@@ -84,7 +83,11 @@ matches
 └── ...
 ```
 
+all_regions, formation_id_name_mapppings, match_centre_event_type does not have a specific structure.
+Because it is same for all leagues and regions.
+
 ## Populating Data
 
 The `populate` command allows you to populate match data from a JSON file. 
 And writes it to matches.db file.
+Or you can change the database by set the DATABASE_URI environment variable.
