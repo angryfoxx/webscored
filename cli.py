@@ -16,6 +16,10 @@ from scraper import (
     get_matches_by_month,
     update_matches_by_recent_matches,
 )
+from crawler import (
+    get_matches_by_month_with_pw,
+    update_matches_by_recent_matches_with_pw,
+)
 from utils import find_valid_urls
 
 
@@ -36,8 +40,7 @@ async def scrape_url(url: str, playwright: bool = False):
 
     click.echo("\033[93mFetching matches...\033[0m")
     if playwright:
-        # TODO: Implement Playwright scraping
-        ...
+        await get_matches_by_month_with_pw(url)
     else:
         await get_matches_by_month(url)
 
@@ -179,7 +182,10 @@ async def cli(fetch_all, all_leagues, playwright, populate, scrape, run, fetch_r
 
     if fetch_recent:
         logger.info("Fetching recent matches...")
-        await update_matches_by_recent_matches()
+        if playwright:
+            await update_matches_by_recent_matches_with_pw()
+        else:
+            await update_matches_by_recent_matches()
         populate_data()
         click.echo(
             "\033[92mRecent matches fetched and database populated successfully!\033[0m"

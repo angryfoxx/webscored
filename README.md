@@ -45,6 +45,10 @@ And the following options:
 - `--fetch-all` or `-fa`: Fetch all matches for the selected region.
 - `--all-leagues` or `-al`: Fetch all leagues for the selected region.
 - `--playwright` or `-pw`: Use Playwright to scrape data.
+Do not forget to install Playwright dependencies if you want to use this option.
+```
+playwright install
+```
 
 To run a command, use the following syntax:
 

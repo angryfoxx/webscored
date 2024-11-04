@@ -8,6 +8,7 @@ from collections import defaultdict
 import httpx
 from tqdm.asyncio import tqdm
 
+from constants import RETRY_LIMIT
 from logger import logger
 from parsers import parse_base_data, parse_base_url, parse_match_html
 from utils import HEADERS, fetch_url, find_valid_urls, write_file
@@ -20,7 +21,7 @@ def fetch_base_data(retry: int = 0) -> None:
     """
 
     def _retry():
-        if retry < 3:
+        if retry < RETRY_LIMIT:
             time.sleep(1)
             return fetch_base_data(retry=retry + 1)
         logger.error(

@@ -7,6 +7,7 @@ import httpx
 from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm
 
+from constants import RETRY_LIMIT
 from logger import logger
 
 HEADERS = {
@@ -23,7 +24,7 @@ HEADERS = {
 
 async def fetch_url(client, url: str, retry: int = 0) -> bytes:
     async def _retry():
-        if retry < 3:
+        if retry < RETRY_LIMIT:
             await asyncio.sleep(1)
             return await fetch_url(client, url, retry=retry + 1)
         logger.error("Failed to fetch %s after 3 retries", url)
