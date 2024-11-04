@@ -148,21 +148,18 @@ def get_urls(tournament_urls):
     help="Use Playwright for scraping.",
 )
 @click.option(
-    "populate",
     "--populate",
     "-p",
     is_flag=True,
     help="Populate the database from a JSON file.",
 )
 @click.option(
-    "scrape",
     "--scrape",
     "-s",
     is_flag=True,
     help="Scrape data from an external source.",
 )
 @click.option(
-    "run",
     "--run",
     "-r",
     is_flag=True,

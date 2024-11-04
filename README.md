@@ -35,9 +35,9 @@ python cli.py
 
 The CLI provides the following commands:
 
-- `populate` or `--populate`or `-p`: Populate match data from a JSON file.
-- `scrape` or `--scrape` or `-s`: Scrape match data from external sources.
-- `run` or `--run` or `-r`: Run both tasks in sequence.
+- `--populate`or `-p`: Populate match data from a JSON file.
+- `--scrape` or `-s`: Scrape match data from external sources.
+- `--run` or `-r`: Run both tasks in sequence.
 - 
 And the following options:
 
