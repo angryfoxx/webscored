@@ -52,6 +52,8 @@ def fetch_page_content_sync(
                     f"Failed to fetch content from {url} after {RETRY_LIMIT} attempts"
                 )
 
+            time.sleep(1)
+
 
 async def fetch_page_content(
     page,
@@ -88,7 +90,7 @@ async def fetch_page_content(
                 logger.error(
                     f"Failed to fetch content from {url} after {RETRY_LIMIT} attempts"
                 )
-
+            await asyncio.sleep(1)
 
 async def get_tournaments_by_month_by_pw(base_data_url: str) -> dict[str, list[dict]]:
     async with async_playwright() as p:
