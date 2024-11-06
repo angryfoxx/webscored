@@ -14,7 +14,7 @@ from parsers import parse_base_data, parse_base_url, parse_match_html
 from utils import HEADERS, fetch_url, find_valid_urls, write_file
 
 
-def fetch_base_data(retry: int = 0) -> None:
+def fetch_base_data(playwright: bool = False, retry: int = 0) -> None:
     """Save all regions and top matches to a JSON file.
 
     Regions doesn't change often, so we can save it once and use it later.
@@ -29,13 +29,26 @@ def fetch_base_data(retry: int = 0) -> None:
         )
         raise Exception("Failed to fetch base data")
 
-    client = httpx.Client(headers=HEADERS)
+    if playwright:
+        from playwright.sync_api import sync_playwright
 
-    response = client.get("https://www.whoscored.com/")
-    if response.status_code != 200:
-        return _retry()
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=False)
+            page = browser.new_page()
+            page.set_extra_http_headers(HEADERS)
+            page.goto("https://www.whoscored.com/", wait_until="domcontentloaded")
+            page_content = page.content()
 
-    parse_base_data(response.content.decode("utf-8"))
+    else:
+        client = httpx.Client(headers=HEADERS)
+
+        response = client.get("https://www.whoscored.com/")
+        if response.status_code != 200:
+            return _retry()
+
+        page_content = response.content.decode("utf-8")
+
+    parse_base_data(page_content)
 
 
 async def get_tournaments_by_month(

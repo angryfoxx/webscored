@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import random
+import sys
 
 import asyncclick as click
 import pydash
@@ -9,16 +10,16 @@ from alembic import command
 from alembic.config import Config
 
 from constants import DATABASE_URI
+from crawler import (
+    get_matches_by_month_with_pw,
+    update_matches_by_recent_matches_with_pw,
+)
 from logger import logger
 from populate import populate_data
 from scraper import (
     fetch_base_data,
     get_matches_by_month,
     update_matches_by_recent_matches,
-)
-from crawler import (
-    get_matches_by_month_with_pw,
-    update_matches_by_recent_matches_with_pw,
 )
 from utils import find_valid_urls
 
@@ -250,9 +251,10 @@ if __name__ == "__main__":
     if not os.path.exists("matches"):
         os.makedirs("matches")
 
+    pw = "--playwright" in sys.argv or "-pw" in sys.argv
     if not os.path.exists("matches/all_regions.json"):
         click.echo("\033[93mBase data not found. Fetching base data...\033[0m")
-        fetch_base_data()
+        fetch_base_data(pw)
         click.echo("\033[92mBase data fetched successfully!\033[0m")
 
     with open("matches/all_regions.json", "r", encoding="utf-8") as file:
