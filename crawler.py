@@ -5,18 +5,23 @@ import os
 import time
 from collections import defaultdict
 
-import httpx
+from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 from tqdm.asyncio import tqdm
 
 from constants import CONCURRENCY_LIMIT, RETRY_LIMIT
 from logger import logger
 from parsers import parse_base_url, parse_match_html
-from scraper import find_matches_url_by_tournaments, get_tournaments_by_month
-from utils import HEADERS, fetch_url, find_valid_urls, write_file
+from scraper import find_matches_url_by_tournaments
+from utils import HEADERS, write_file
 
 
-async def fetch_page_content(page, url: str, save_path: str) -> None:
+def fetch_page_content_sync(
+    page,
+    url: str,
+    save_path: str | None = None,
+    save_file=True,
+):
     """
     Fetches the page content using a Playwright page instance and saves it to a specified path.
 
@@ -24,11 +29,17 @@ async def fetch_page_content(page, url: str, save_path: str) -> None:
         page (Page): The Playwright page instance.
         url (str): The URL to scrape.
         save_path (str): The file path to save the scraped content.
+        save_file (bool): Whether to save the content to a file or not.
     """
     for attempt in range(RETRY_LIMIT):
         try:
-            await page.goto(url, wait_until="domcontentloaded")
-            content = await page.content()
+            page.goto(url, wait_until="domcontentloaded")
+            content = page.content()
+            if "525: SSL handshake failed" in content:
+                raise Exception("SSL handshake failed")
+
+            if not save_file:
+                return content
             write_file(save_path, content)
             logger.info(f"Successfully fetched content from {url}")
             return  # Exit on successful fetch
@@ -42,17 +53,88 @@ async def fetch_page_content(page, url: str, save_path: str) -> None:
                 )
 
 
+async def fetch_page_content(
+    page,
+    url: str,
+    save_path: str | None = None,
+    save_file=True,
+):
+    """
+    Fetches the page content using a Playwright page instance and saves it to a specified path.
+
+    Args:
+        page (Page): The Playwright page instance.
+        url (str): The URL to scrape.
+        save_path (str): The file path to save the scraped content.
+        save_file (bool): Whether to save the content to a file or not.
+    """
+    for attempt in range(RETRY_LIMIT):
+        try:
+            await page.goto(url, wait_until="domcontentloaded")
+            content = await page.content()
+            if "525: SSL handshake failed" in content:
+                raise Exception("SSL handshake failed")
+
+            if not save_file:
+                return content
+            write_file(save_path, content)
+            logger.info(f"Successfully fetched content from {url}")
+            return  # Exit on successful fetch
+        except Exception as e:
+            logger.error(
+                f"Attempt {attempt + 1} to fetch content from {url} failed: {e}"
+            )
+            if attempt + 1 == RETRY_LIMIT:
+                logger.error(
+                    f"Failed to fetch content from {url} after {RETRY_LIMIT} attempts"
+                )
+
+
+async def get_tournaments_by_month_by_pw(base_data_url: str) -> dict[str, list[dict]]:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)  # Limit concurrent tasks
+
+        responses = []
+        async with semaphore:
+            for month in range(1, 13):
+                page = await browser.new_page()
+                await page.set_extra_http_headers(HEADERS)
+                content = await fetch_page_content(
+                    page, base_data_url.format(month=month), None, save_file=False
+                )
+                responses.append(content)
+                await page.close()
+
+        await browser.close()
+
+    tournaments_by_month = defaultdict(list)
+    for response, month in zip(responses, range(1, 13)):
+        try:
+            response = response.replace("</body></html>", "").replace(
+                "<html><head></head><body>", ""
+            )
+            tournament_data = json.loads(response)
+            tournaments = tournament_data.get("tournaments", [])
+            if not tournaments:
+                continue
+
+            tournaments_by_month[calendar.month_name[month]].extend(tournaments)
+        except json.JSONDecodeError:
+            continue
+
+    return tournaments_by_month
+
+
 async def get_matches_by_month_with_pw(base_url: str) -> None:
     base_match_url, base_data_url, league_name = parse_base_url(base_url)
 
-    limits = httpx.Limits(max_keepalive_connections=10, max_connections=20)
-    async with httpx.AsyncClient(headers=HEADERS, limits=limits) as client:
-        tournaments = await get_tournaments_by_month(client, base_data_url)
-        match_urls = find_matches_url_by_tournaments(
-            tournaments,
-            base_match_url,
-            league_name,
-        )
+    tournaments = await get_tournaments_by_month_by_pw(base_data_url)
+    match_urls = find_matches_url_by_tournaments(
+        tournaments,
+        base_match_url,
+        league_name,
+    )
 
     async with async_playwright() as p:
         browser = await p.chromium.launch()
@@ -92,6 +174,61 @@ async def get_matches_by_month_with_pw(base_url: str) -> None:
             parse_match_html(content, month, league_name)
 
 
+async def find_valid_urls_with_pw(tournament_urls: list[str]) -> None:
+    """We have a list of URLs that has not season id and stage id.
+
+    We need to find full URLs that contain season id and stage id.
+    """
+    logger.info("Finding valid URLs...")
+    tournament_url_mapping = {}
+
+    if os.path.exists("matches/tournament_url_mapping.json"):
+        with open("matches/tournament_url_mapping.json", "r", encoding="utf-8") as f:
+            existing_tournament_url_mapping = json.load(f)
+            existing_tournament_url_mapping.update(tournament_url_mapping)
+            tournament_url_mapping = existing_tournament_url_mapping
+
+    tournament_urls = tuple(
+        filter(lambda url: url not in tournament_url_mapping, tournament_urls)
+    )
+    if not tournament_urls:
+        return
+
+    responses = []
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+        async with semaphore:
+            for url in tqdm(tournament_urls, desc="Finding valid URLs"):
+                page = await browser.new_page()
+                await page.set_extra_http_headers(HEADERS)
+                response = await fetch_page_content(page, url, None, save_file=False)
+                responses.append(response)
+                await page.close()
+
+        for response, url in tqdm(
+            zip(responses, tournament_urls),
+            desc="Finding valid URLs",
+        ):
+            if not response:
+                continue
+
+            soup = BeautifulSoup(response, "lxml")
+            canonical_link = soup.find("link", {"rel": "canonical"})
+            if not canonical_link:
+                logger.error("No valid link found for %s", url)
+                continue
+
+            valid_url = canonical_link["href"]
+            tournament_url_mapping[url] = valid_url
+
+        write_file(
+            "matches/tournament_url_mapping.json", tournament_url_mapping, is_json=True
+        )
+
+    await browser.close()
+
+
 async def update_matches_by_recent_matches_with_pw() -> None:
     now = time.localtime()
     month = now.tm_mon
@@ -101,11 +238,19 @@ async def update_matches_by_recent_matches_with_pw() -> None:
     today_url = f"https://www.whoscored.com/livescores/data?d=2024{month:02d}{day:02d}&isSummary=true"
     yesterday_url = f"https://www.whoscored.com/livescores/data?d=2024{month:02d}{day - 1:02d}&isSummary=true"
 
-    # Fetch tournament data URLs
-    async with httpx.AsyncClient(headers=HEADERS) as client:
-        responses = await asyncio.gather(
-            fetch_url(client, today_url), fetch_url(client, yesterday_url)
-        )
+    responses = []
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        for url in [today_url, yesterday_url]:
+            page = await browser.new_page()
+            await page.set_extra_http_headers(HEADERS)
+            content = await fetch_page_content(page, url, None, save_file=False)
+            content = content.replace("</body></html>", "").replace(
+                "<html><head></head><body>", ""
+            )
+            responses.append(json.loads(content))
+            await page.close()
+        await browser.close()
 
     with open("matches/all_regions.json", "r", encoding="utf-8") as file:
         region_data = json.load(file)
@@ -121,7 +266,7 @@ async def update_matches_by_recent_matches_with_pw() -> None:
     tournaments = []
     base_tournament_urls = []
     for response, day in zip(responses, [day, day - 1]):
-        for tournament in json.loads(response)["tournaments"]:
+        for tournament in response["tournaments"]:
             tournament["x-day"] = day
             tournaments.append(tournament)
             base_tournament_urls.append(
@@ -130,7 +275,7 @@ async def update_matches_by_recent_matches_with_pw() -> None:
                 ]
             )
 
-    await find_valid_urls(base_tournament_urls)
+    await find_valid_urls_with_pw(base_tournament_urls)
 
     with open("matches/tournament_url_mapping.json", "r", encoding="utf-8") as f:
         tournament_url_mapping = json.load(f)

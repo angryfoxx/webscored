@@ -32,12 +32,19 @@ def fetch_base_data(playwright: bool = False, retry: int = 0) -> None:
     if playwright:
         from playwright.sync_api import sync_playwright
 
+        from crawler import fetch_page_content_sync
+
         with sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page()
             page.set_extra_http_headers(HEADERS)
-            page.goto("https://www.whoscored.com/", wait_until="domcontentloaded")
-            page_content = page.content()
+            page_content = fetch_page_content_sync(
+                page,
+                "https://www.whoscored.com/",
+                save_file=False,
+            )
+            page.close()
+            browser.close()
 
     else:
         client = httpx.Client(headers=HEADERS)
