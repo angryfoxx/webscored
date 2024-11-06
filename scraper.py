@@ -33,7 +33,7 @@ def fetch_base_data(playwright: bool = False, retry: int = 0) -> None:
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)
+            browser = p.chromium.launch()
             page = browser.new_page()
             page.set_extra_http_headers(HEADERS)
             page.goto("https://www.whoscored.com/", wait_until="domcontentloaded")
