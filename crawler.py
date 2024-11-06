@@ -19,7 +19,7 @@ from utils import HEADERS, write_file
 def fetch_page_content_sync(
     page,
     url: str,
-    save_path: str | None = None,
+    save_path: str = None,
     save_file=True,
 ):
     """
@@ -58,7 +58,7 @@ def fetch_page_content_sync(
 async def fetch_page_content(
     page,
     url: str,
-    save_path: str | None = None,
+    save_path: str = None,
     save_file=True,
 ):
     """
